@@ -623,9 +623,8 @@ stat, p_value = stats.mannwhitneyu(deficient, normal)`}
               </CardContent>
             </Card>
           </TabsContent>
-        </Tabs>
 
-        {/* 管理機能 */}
+          {/* 管理機能 */}
           <TabsContent value="admin">
             <Card>
               <CardHeader>
