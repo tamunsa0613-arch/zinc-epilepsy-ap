@@ -1,0 +1,70 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ユーザー情報を取得するヘルパー関数
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    // 認証済みかチェック
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // 同じ施設のユーザーかチェック
+    function isSameFacility(facilityId) {
+      return isAuthenticated() && getUserData().facilityId == facilityId;
+    }
+
+    // 管理者かチェック
+    function isAdmin() {
+      return isAuthenticated() && getUserData().role == 'admin';
+    }
+
+    // 施設コレクション（登録時に一覧表示が必要なため読み取りは許可）
+    match /facilities/{facilityId} {
+      allow read: if true;
+      allow create: if isAuthenticated();
+      allow update, delete: if isAdmin() && isSameFacility(facilityId);
+    }
+
+    // ユーザーコレクション
+    match /users/{userId} {
+      allow read: if isAuthenticated() && (request.auth.uid == userId || isSameFacility(resource.data.facilityId));
+      allow create: if isAuthenticated() && request.auth.uid == userId;
+      // 自分自身の更新、または管理者が同じ施設のユーザーを更新可能
+      allow update: if isAuthenticated() &&
+        (request.auth.uid == userId || (isAdmin() && isSameFacility(resource.data.facilityId)));
+      // 管理者が同じ施設のユーザーを削除可能
+      allow delete: if isAdmin() && isSameFacility(resource.data.facilityId);
+    }
+
+    // 患者コレクション
+    match /patients/{patientId} {
+      allow read, write: if isSameFacility(resource.data.facilityId) ||
+                           (request.resource != null && isSameFacility(request.resource.data.facilityId));
+      allow create: if isAuthenticated();
+
+      // 検査結果サブコレクション
+      match /labResults/{labId} {
+        allow read, write: if isAuthenticated();
+      }
+
+      // 発作記録サブコレクション
+      match /seizureLogs/{logId} {
+        allow read, write: if isAuthenticated();
+      }
+
+      // AED記録サブコレクション
+      match /aedRecords/{recordId} {
+        allow read, write: if isAuthenticated();
+      }
+    }
+
+    // OCRアップロードコレクション
+    match /ocrUploads/{uploadId} {
+      allow read, write: if isAuthenticated();
+    }
+  }
+}
